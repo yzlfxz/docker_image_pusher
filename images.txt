@@ -1,2 +1,4 @@
 19970688/nastools-bt
 leifengyang/jenkins:2.455-jdk21
+johngong/qbittorrent:4.6.5-4.6.5.10
+linuxserver/jackett
