@@ -5,3 +5,4 @@ linuxserver/jackett
 flaresolverr/flaresolverr
 allanpk716/chinesesubfinder:latest
 elasticsearch:8.15.0
+kibana:8.15.0
