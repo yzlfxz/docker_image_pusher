@@ -8,3 +8,4 @@ elasticsearch:8.15.0
 kibana:8.15.0
 elasticsearch:8.14.3
 kibana:8.14.3
+nacos/nacos-server:v2.4.2
