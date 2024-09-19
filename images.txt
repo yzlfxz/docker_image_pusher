@@ -10,3 +10,4 @@ elasticsearch:8.14.3
 kibana:8.14.3
 nacos/nacos-server:v2.4.2
 amazoncorretto:8u422-alpine3.19
+openjdk:17-jdk-slim
