@@ -13,3 +13,4 @@ amazoncorretto:8u422-alpine3.19
 openjdk:17-jdk-slim
 redis/redis-stack-server:latest
 mysql:lts
+apache/seata-server:2.2.0.jre17-slim
