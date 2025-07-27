@@ -14,3 +14,4 @@ openjdk:17-jdk-slim
 redis/redis-stack-server:latest
 mysql:lts
 apache/seata-server:2.2.0.jre17-slim
+nacos/nacos-server:v2.4.2-slim
