@@ -16,3 +16,4 @@ mysql:lts
 apache/seata-server:2.2.0.jre17-slim
 nacos/nacos-server:v2.4.2-slim
 king019/sentinel:dashbord_1.8.8_x86_64
+yangliu/nps:latest
