@@ -1,1 +1,1 @@
-yangliu/nps:latest
+milvusdb/milvus:master-20260608-7cf2530b
