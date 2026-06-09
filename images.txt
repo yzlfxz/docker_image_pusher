@@ -1,1 +1,1 @@
-milvusdb/milvus:master-20260608-7cf2530b
+milvusdb/milvus:master-20260609-1f9da58f
