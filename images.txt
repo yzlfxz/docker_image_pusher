@@ -1,1 +1,2 @@
-milvusdb/milvus:master-20260609-1f9da58f
+cwq1913/lama-cleaner:cpu-1.2.5
+thr3a/iopaint:20250409
