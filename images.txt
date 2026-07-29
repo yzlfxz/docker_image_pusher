@@ -1,2 +1,1 @@
-cwq1913/lama-cleaner:cpu-1.2.5
-thr3a/iopaint:20250409
+palemoky/chinese-poetry-api
