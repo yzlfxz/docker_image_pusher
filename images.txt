@@ -1,1 +1,1 @@
-palemoky/chinese-poetry-api
+paketobuildpacks/poetry
