@@ -1,1 +1,1 @@
-paketobuildpacks/poetry
+cosincox/easyvoice
