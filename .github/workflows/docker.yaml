@@ -114,7 +114,6 @@ jobs:
                 platform=$(echo "$entry" | jq -c '.platform')
                 echo "Check entry digest=$digest mediaType=$mediaType os=$os arch=$arch platform=$platform"
 
-                # 新增判断：os或arch为unknown，直接跳过
                 if [[ "$mediaType" == "application/vnd.oci.empty.v1+json" || "$os" == "unknown" || "$arch" == "unknown" ]];then
                     echo "👉 Skip invalid/empty manifest (os/arch unknown), do NOT copy"
                     continue
@@ -134,7 +133,8 @@ jobs:
             fi
 
             TARGET_FULL="docker://${new_image_full}"
-            skopeo manifest create ${TARGET_FULL} "${selected_digests[@]}" --amend
+            # 删除 --amend
+            skopeo manifest create ${TARGET_FULL} "${selected_digests[@]}"
 
             skopeo inspect --raw ${TARGET_FULL} > final.json
             cat final.json
