@@ -29,36 +29,25 @@ jobs:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
-
         root-reserve-mb: 2048
         swap-size-mb: 128
         remove-dotnet: 'true'
         remove-haskell: 'true'
-        # 如果空间还是不够用，可以把以下开启，清理出更多空间
-        # remove-android: 'true'
-        # remove-codeql: 'true'
         build-mount-path: '/var/lib/docker/'
 
-    - name: Restart docker
-      run: sudo service docker restart
-
-    - name: Free up disk space complete
+    - name: Install skopeo
       run: |
-        echo "Free up disk space complete"
-        echo "=============================================================================="
-        df -hT
-        echo "=============================================================================="
+        sudo apt update
+        sudo apt install -y skopeo
 
     - name: Checkout Code
       uses: actions/checkout@v5
 
-    - name: Docker Setup Buildx
-      uses: docker/setup-buildx-action@v4
-
-    - name: Build and push image Aliyun
+    - name: Sync multi-arch images to Aliyun ACR
       run: |
-        docker login -u $ALIYUN_REGISTRY_USER -p $ALIYUN_REGISTRY_PASSWORD $ALIYUN_REGISTRY
-        # 数据预处理,判断镜像是否重名
+        # 登录阿里云ACR（skopeo使用该凭证）
+        DEST_CREDS="${ALIYUN_REGISTRY_USER}:${ALIYUN_REGISTRY_PASSWORD}"
+
         declare -A duplicate_images
         declare -A temp_map
         while IFS= read -r line || [ -n "$line" ]; do
@@ -106,25 +95,16 @@ jobs:
                 continue
             fi
         
-            echo "docker pull $line"
-            docker pull $line
-            platform=$(echo "$line" | awk -F'--platform[ =]' '{if (NF>1) print $2}' | awk '{print $1}')
-            echo "platform is $platform"
-            # 如果存在架构信息 将架构信息拼到镜像名称前面
-            if [ -z "$platform" ]; then
-                platform_prefix=""
-            else
-                platform_prefix="${platform//\//_}_"
-            fi
-            echo "platform_prefix is $platform_prefix"
-            # 获取镜像的完整名称，例如kasmweb/nginx:1.25.3（命名空间/镜像名:版本号）
+            echo "===== Source line: $line ====="
             image=$(echo "$line" | awk '{print $NF}')
+            image="${image%%@*}"
+            echo "source image: $image"
 
-            # 获取 镜像名:版本号  例如nginx:1.25.3
+            # 获取 镜像名:版本号
             image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
-            # 获取命名空间 例如kasmweb  这里有种特殊情况 docker.io/nginx，把docker.io当成命名空间，也OK
+            # 获取命名空间
             name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print ""}')
-            # 获取镜像名例  例如nginx
+            # 获取镜像名
             image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
         
             name_space_prefix=""
@@ -136,22 +116,25 @@ jobs:
                fi
             fi
             
-            # 将@sha256:等字符删除
             image_name_tag="${image_name_tag%%@*}"
-            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/$platform_prefix$name_space_prefix$image_name_tag"
-            echo "docker tag $image $new_image"
-            docker tag $image $new_image
-            echo "docker push $new_image"
-            docker push $new_image
-            echo "开始清理磁盘空间"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="
-            docker rmi $image
-            docker rmi $new_image
-            echo "磁盘空间清理完毕"
-            echo "=============================================================================="
-            df -hT
-            echo "=============================================================================="     
-            
+            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${name_space_prefix}${image_name_tag}"
+            echo "target aliyun image: $new_image"
+
+            # ========== 核心修改：使用skopeo --all 完整复制多架构 ==========
+            skopeo copy --all --retry-times 3 \
+              --dest-creds $DEST_CREDS \
+              docker://${image} \
+              docker://${new_image}
+
+            # 可选：校验目标镜像是否包含多架构
+            echo "===== Verify manifest ====="
+            skopeo inspect --raw docker://${new_image} > manifest.json
+            cat manifest.json
+            if grep -q '"manifests"' manifest.json; then
+              echo "✅ Multi-arch manifest exists"
+            else
+              echo "⚠️ WARNING: This is single arch image!"
+            fi
+            rm -f manifest.json
+
         done < images.txt
