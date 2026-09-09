@@ -42,6 +42,10 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v5
 
+    - name: Login to Aliyun ACR
+      run: |
+        echo $ALIYUN_REGISTRY_PASSWORD | docker login $ALIYUN_REGISTRY -u $ALIYUN_REGISTRY_USER --password-stdin
+
     - name: Sync multi-arch images to Aliyun ACR
       run: |
         DEST_CREDS="${ALIYUN_REGISTRY_USER}:${ALIYUN_REGISTRY_PASSWORD}"
@@ -105,6 +109,7 @@ jobs:
 
             manifests=$(jq -c '.manifests[]' source_manifest.json)
             selected_digests=()
+            docker_refs=()
 
             while IFS= read -r entry; do
                 digest=$(echo "$entry" | jq -r '.digest')
@@ -124,25 +129,20 @@ jobs:
                   ${SOURCE_IMG_PREFIX}@${digest} \
                   docker://${new_repo}@${digest}
                 selected_digests+=("docker://${new_repo}@${digest}")
+                docker_refs+=("${new_repo}@${digest}")
             done <<< "$manifests"
 
-            echo "Collected digests for manifest list: ${selected_digests[*]}"
-            if [[ ${#selected_digests[@]} -eq 0 ]];then
+            echo "Collected digests: ${docker_refs[*]}"
+            if [[ ${#docker_refs[@]} -eq 0 ]];then
                 echo "❌ No valid manifest found!"
                 exit 1
             fi
 
-            TARGET_FULL="docker://${new_image_full}"
-            # 删除 --amend
-            skopeo manifest create ${TARGET_FULL} "${selected_digests[@]}"
+            # 使用docker manifest创建多架构清单，替代skopeo manifest
+            docker manifest create ${new_image_full} "${docker_refs[@]}"
+            docker manifest push ${new_image_full}
 
-            skopeo inspect --raw ${TARGET_FULL} > final.json
-            cat final.json
-            if jq -e '.manifests' final.json >/dev/null;then
-              echo "✅ multi arch ok"
-            else
-              echo "❌ manifest build error"
-              exit 1
-            fi
-            rm -f source_manifest.json final.json
+            # 校验
+            docker manifest inspect ${new_image_full}
+            rm -f source_manifest.json
         done < images.txt
