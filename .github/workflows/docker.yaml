@@ -103,18 +103,20 @@ jobs:
 
             skopeo inspect --raw docker://${SOURCE_IMG_RAW} > source_manifest.json
 
-            # 输出manifest数组，循环读取每一条
             manifests=$(jq -c '.manifests[]' source_manifest.json)
             selected_digests=()
 
             while IFS= read -r entry; do
                 digest=$(echo "$entry" | jq -r '.digest')
                 mediaType=$(echo "$entry" | jq -r '.mediaType')
+                os=$(echo "$entry" | jq -r '.platform.os')
+                arch=$(echo "$entry" | jq -r '.platform.architecture')
                 platform=$(echo "$entry" | jq -c '.platform')
-                echo "Check entry digest=$digest mediaType=$mediaType platform=$platform"
+                echo "Check entry digest=$digest mediaType=$mediaType os=$os arch=$arch platform=$platform"
 
-                if [[ "$mediaType" == "application/vnd.oci.empty.v1+json" ]];then
-                    echo "👉 Skip OCI empty manifest, do NOT copy"
+                # 新增判断：os或arch为unknown，直接跳过
+                if [[ "$mediaType" == "application/vnd.oci.empty.v1+json" || "$os" == "unknown" || "$arch" == "unknown" ]];then
+                    echo "👉 Skip invalid/empty manifest (os/arch unknown), do NOT copy"
                     continue
                 fi
                 echo "✅ Accept this manifest, start copy"
