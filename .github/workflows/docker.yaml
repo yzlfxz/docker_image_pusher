@@ -92,9 +92,7 @@ jobs:
             fi
 
             image_name_tag="${image_name_tag%%@*}"
-            # new_image_full: 带tag，最终对外的镜像
             new_image_full="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${name_space_prefix}${image_name_tag}"
-            # new_repo: 剥离tag，仅仓库名，用于推送@digest镜像
             new_repo="${new_image_full%:*}"
             echo "target full(with tag): $new_image_full"
             echo "target repo(no tag): $new_repo"
@@ -103,27 +101,24 @@ jobs:
             SOURCE_REPO=$(echo "${SOURCE_IMG_RAW}" | cut -d: -f1)
             SOURCE_IMG_PREFIX="docker://${SOURCE_REPO}"
 
-            # 获取源manifest，过滤OCI empty
             skopeo inspect --raw docker://${SOURCE_IMG_RAW} > source_manifest.json
-            DIGESTS=$(jq -r '.manifests[] | select(.mediaType!="application/vnd.oci.empty.v1+json") | .digest' source_manifest.json)
-            echo "有效digest: $DIGESTS"
+            # 关键修改：只保留带有platform、非OCI-empty的manifest
+            DIGESTS=$(jq -r '.manifests[] | select(.mediaType!="application/vnd.oci.empty.v1+json" and has("platform")) | .digest' source_manifest.json)
+            echo "过滤后有效digest: $DIGESTS"
 
-            # 逐个推送：目标只用不带tag的仓库名 + @digest
             for dg in $DIGESTS; do
               echo "Copy ${SOURCE_IMG_PREFIX}@$dg ==> docker://${new_repo}@$dg"
               skopeo copy --retry-times 3 \
                 --dest-creds $DEST_CREDS \
                 ${SOURCE_IMG_PREFIX}@${dg} \
-                docker://${new_repo}@${dg}
+                docker://${new_repo}@$dg
             done
 
-            # 组装多架构manifest，绑定到带tag的镜像
             TARGET_FULL="docker://${new_image_full}"
             DIGEST_LIST=$(echo $DIGESTS | sed "s# # docker://${new_repo}@#g" | sed "s#^#docker://${new_repo}@#")
             echo "Build manifest list: $TARGET_FULL with $DIGEST_LIST"
             skopeo manifest create ${TARGET_FULL} $DIGEST_LIST --amend
 
-            # 校验
             skopeo inspect --raw ${TARGET_FULL} > final.json
             cat final.json
             if jq -e '.manifests' final.json >/dev/null;then
